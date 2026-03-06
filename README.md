@@ -53,6 +53,26 @@ streamlit run app.py
 
 Open the URL shown in your terminal (usually `http://localhost:8501`).
 
+## Deploy to Streamlit Community Cloud
+
+1. **Push your code to GitHub** (including the trained model).
+   - The app needs `model/digit_model.keras` to run. If you haven’t already, run `python train/train_model.py` locally, then commit and push the `model/` folder:
+     ```bash
+     python train/train_model.py
+     git add model/digit_model.keras
+     git commit -m "Add trained digit model"
+     git push
+     ```
+
+2. **Go to [share.streamlit.io](https://share.streamlit.io)** and sign in with GitHub.
+
+3. **Deploy the app**
+   - Click **“New app”**.
+   - Choose your **repository**, **branch** (e.g. `main`), and set **Main file path** to `app.py`.
+   - Click **Deploy**. Streamlit Cloud will use the root `requirements.txt` and run `streamlit run app.py`.
+
+4. **Wait for the first build** (a few minutes). Your app will be available at `https://<your-app-name>.streamlit.app`.
+
 ## Usage
 
 1. **Upload** a clear photo of a Sudoku puzzle using the sidebar.
