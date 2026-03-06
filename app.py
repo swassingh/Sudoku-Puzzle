@@ -61,10 +61,10 @@ with st.sidebar:
         "Sudoku image", type=["jpg", "jpeg", "png", "bmp", "webp"],
     )
     st.divider()
-    confidence_threshold = st.slider(
-        "Confidence threshold",
-        min_value=0.3, max_value=1.0, value=0.80, step=0.05,
-        help="Lower → more digits detected (may include errors). Higher → fewer but safer.",
+    grid_fill_fraction = st.slider(
+        "Grid Completion Percentage",
+        min_value=0.1, max_value=1.0, value=0.80, step=0.05,
+        help="Fraction of cells the model fills (by confidence). Lower = fewer cells pre-filled; higher = more cells filled by the model.",
     )
     show_overlay = st.checkbox("Overlay solution on original", value=True)
 
@@ -113,7 +113,7 @@ except FileNotFoundError:
     st.error("Trained model not found — run `python train/train_model.py` first.")
     st.stop()
 
-board, confidences = recognize_grid(cells, confidence_threshold)
+board, confidences = recognize_grid(cells, grid_fill_fraction)
 low_conf_count = int(np.sum((confidences < 0.85) & (board != 0)))
 
 # ── Layout: image column  |  grid column ─────────────────────────────────────
@@ -149,7 +149,7 @@ with col_grid:
 
     st.caption("Edit any cell directly (0 = empty). Columns and rows are labelled 1–9.")
 
-    upload_key = uploaded_file.name + str(confidence_threshold)
+    upload_key = uploaded_file.name + str(grid_fill_fraction)
     if st.session_state.get("_upload_key") != upload_key:
         st.session_state._upload_key = upload_key
         st.session_state.board_df = pd.DataFrame(
@@ -197,21 +197,34 @@ if solve_btn:
         st.error("No valid solution exists — the puzzle may be incorrect.")
         st.stop()
 
+    # Apply grid_fill_fraction to solution: only reveal that fraction of empty cells
+    empty_cells = [(r, c) for r in range(9) for c in range(9) if edited_board[r, c] == 0]
+    n_reveal = max(0, min(len(empty_cells), int(round(len(empty_cells) * grid_fill_fraction))))
+    displayed_solution = edited_board.copy()
+    for i in range(n_reveal):
+        r, c = empty_cells[i]
+        displayed_solution[r, c] = solution[r, c]
+
     st.divider()
     st.subheader("Solution")
     sol_left, sol_right = st.columns(2, gap="large")
 
     with sol_left:
-        st.markdown(render_board_html(solution, original=edited_board), unsafe_allow_html=True)
+        st.markdown(render_board_html(displayed_solution, original=edited_board), unsafe_allow_html=True)
         with st.expander("Plain text"):
+            st.code(board_to_string(displayed_solution))
+        if n_reveal < len(empty_cells):
+            st.caption(f"Showing {n_reveal} of {len(empty_cells)} filled cells ({100 * grid_fill_fraction:.0f}%). Increase the slider to see more.")
+        with st.expander("Show full solution"):
+            st.markdown(render_board_html(solution, original=edited_board), unsafe_allow_html=True)
             st.code(board_to_string(solution))
 
     with sol_right:
         if show_overlay and corners is not None:
-            overlay = overlay_solution_on_original(image, corners, edited_board, solution)
+            overlay = overlay_solution_on_original(image, corners, edited_board, displayed_solution)
             st.image(cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB), use_container_width=True,
                      caption="Solution overlaid on original")
         else:
-            warped_sol = draw_solution_on_warped(warped, edited_board, solution)
+            warped_sol = draw_solution_on_warped(warped, edited_board, displayed_solution)
             st.image(cv2.cvtColor(warped_sol, cv2.COLOR_BGR2RGB), use_container_width=True,
                      caption="Solution on warped grid")
